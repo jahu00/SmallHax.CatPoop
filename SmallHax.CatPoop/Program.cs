@@ -5,7 +5,7 @@ using SmallHax.MessageSystem;
 using System;
 using System.Linq;
 
-namespace PoopCat
+namespace SmallHax.CatPoop
 {
     public enum TopicKey { Application, Game, Input }
     class Program
@@ -16,7 +16,7 @@ namespace PoopCat
             var inputTopic = messageBus[TopicKey.Input];
             
             var viewportSize = new Vector2u(320, 240);
-            var window = new RenderWindow(new VideoMode(viewportSize.X, viewportSize.Y, 32), "Poop Cat", Styles.Default, new ContextSettings() { AntialiasingLevel = 8 });
+            var window = new RenderWindow(new VideoMode(viewportSize.X, viewportSize.Y, 32), "Cat Poop", Styles.Default, new ContextSettings() { AntialiasingLevel = 0 });
             window.Size = new Vector2u(viewportSize.X * 3, viewportSize.Y * 3);
             window.Closed += (sender, e) => { window.Close(); };
             window.KeyPressed += (sender, e) => { inputTopic.PublishMessage(e); };

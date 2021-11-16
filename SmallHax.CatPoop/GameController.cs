@@ -2,6 +2,8 @@
 using SFML.System;
 using SFML.Window;
 using SmallHax.MessageSystem;
+using SmallHax.SfmlExtensions;
+using SmallHax.SfmlExtensions.TileMapper;
 using SmallHax.State;
 using System;
 using System.Collections.Generic;
@@ -9,7 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PoopCat
+namespace SmallHax.CatPoop
 {
     public enum GameState
     {
@@ -18,6 +20,7 @@ namespace PoopCat
         Push,
         Drop,
         CheckOver,
+        GrantBonus,
         Over
     }
 
@@ -33,6 +36,9 @@ namespace PoopCat
 
         private Texture FrameTexture { get; set; }
 
+        private SfmlExtensions.Console Sidebar { get; set; }
+        private ConsoleCharacter SidebarBrush { get; set; }
+
         private Game Model { get; set; }
 
         private Vector2i CursorPosition { get; set; }
@@ -45,7 +51,53 @@ namespace PoopCat
             MessageBus = messageBus;
             TileTexture = new Texture("Data/Images/poop.png");
             FrameTexture = new Texture("Data/Images/frame.png");
+            var font = new Texture("Data/Fonts/fat-font-sheet-1.png");
+            var tileset = new Tileset(font, 8, 10);
+            var utf8TileMapper = new Utf8TileMapper();
+            tileset.SetTileMapper(utf8TileMapper);
+            var tileSetName = "fat-font";
+            var tilesets = new Dictionary<string, Tileset>() { { tileSetName, tileset } };
+            Sidebar = new SfmlExtensions.Console(tilesets, 8, 10, 10, 24)
+            {
+                BackgroundColor = new Color(255, 165, 0),
+                Position = new Vector2f(240, 0)
+            };
+            SidebarBrush = new ConsoleCharacter()
+            {
+                TilesetName = tileSetName,
+                ForegroundColor = Color.Black
+            };
+            var sidebarFrameBrush = SidebarBrush with
+            {
+                BackgroundColor = Color.Black,
+                ForegroundColor = new Color(255, 165, 0)
+            };
+            Sidebar.SetText(0, 0, "╔", sidebarFrameBrush);
+            Sidebar.SetText(9, 0, "╗", sidebarFrameBrush);
+            Sidebar.SetText(0, 23, "╚", sidebarFrameBrush);
+            Sidebar.SetText(9, 23, "╝", sidebarFrameBrush);
 
+            CursorPosition = new Vector2i(BoardSize.X / 2, BoardSize.Y / 2);
+            CursorSprite = new Sprite(FrameTexture);
+            InitializeStates();
+            NewGame();
+            StateMachine.SetState(GameState.WaitForMove);
+        }
+
+        private void InitializeStates()
+        {
+            StateMachine = new StateMachine<GameController, GameState>(this);
+            StateMachine.AddState<WaitForMoveStateScript>(GameState.WaitForMove);
+            StateMachine.AddState<PoopStateScript>(GameState.Poop);
+            StateMachine.AddState<PushStateScript>(GameState.Push);
+            StateMachine.AddState<DropStateScript>(GameState.Drop);
+            StateMachine.AddState<CheckOverStateScript>(GameState.CheckOver);
+            StateMachine.AddState<GrantBonusStateScript>(GameState.GrantBonus);
+            StateMachine.AddState<OverStateScript>(GameState.Over);
+        }
+
+        public void NewGame()
+        {
             Model = new Game();
             Model.Tiles = new Tile[BoardSize.X, BoardSize.Y];
 
@@ -61,22 +113,6 @@ namespace PoopCat
                     Model.Tiles[x, y] = tile;
                 }
             }
-
-            CursorPosition = new Vector2i(BoardSize.X / 2, BoardSize.Y / 2);
-            CursorSprite = new Sprite(FrameTexture);
-
-            
-            InitializeStates(GameState.WaitForMove);
-        }
-
-        private void InitializeStates(GameState state)
-        {
-            StateMachine = new StateMachine<GameController, GameState>(this);
-            StateMachine.AddState<WaitForMoveStateScript>(GameState.WaitForMove);
-            StateMachine.AddState<PoopStateScript>(GameState.Poop);
-            StateMachine.AddState<PushStateScript>(GameState.Push);
-            StateMachine.AddState<DropStateScript>(GameState.Drop);
-            StateMachine.SetState(state);
         }
 
         public void Process()
@@ -85,6 +121,32 @@ namespace PoopCat
         }
 
         public void Draw(RenderTarget renderTarget)
+        {
+            DrawTiles(renderTarget);
+            DrawCursor(renderTarget);
+            DrawScore(renderTarget);
+        }
+
+        private void DrawScore(RenderTarget renderTarget)
+        {
+            var scoreStr = Model.Score.ToString().PadLeft(8, '0');
+            /*var text = new Text(scoreStr, Font, 10)
+            {
+                Position = new Vector2f(250, 10)
+            };*/
+
+            Sidebar.SetText(1, 1, scoreStr, SidebarBrush);
+
+            renderTarget.Draw(Sidebar);
+        }
+
+        private void DrawCursor(RenderTarget renderTarget)
+        {
+            CursorSprite.Position = new Vector2f(TileSize.X * CursorPosition.X, TileSize.Y * CursorPosition.Y);
+            renderTarget.Draw(CursorSprite);
+        }
+
+        private void DrawTiles(RenderTarget renderTarget)
         {
             for (var y = 0; y < BoardSize.Y; y++)
             {
@@ -104,10 +166,6 @@ namespace PoopCat
                     renderTarget.Draw(tileSprite);
                 }
             }
-
-            CursorSprite.Position = new Vector2f(TileSize.X * CursorPosition.X, TileSize.Y * CursorPosition.Y);
-
-            renderTarget.Draw(CursorSprite);
         }
 
         public class WaitForMoveStateScript : StateScript<GameController, GameState>
@@ -181,7 +239,14 @@ namespace PoopCat
                 {
                     Owner.Model.Tiles[position.X, position.Y] = null;
                 }
+                GivePoints(positionsOfTilesToRemove.Count);
                 Owner.StateMachine.SetState(GameState.Drop);
+            }
+
+            private void GivePoints(int removedTileCount)
+            {
+                var basePoints = removedTileCount < 5 ? removedTileCount : (1 + removedTileCount % 5);
+                Owner.Model.Score += basePoints * (int)Math.Pow(10, 1 + removedTileCount / 5);
             }
 
             public List<Vector2i> FindMatchingTiles()
@@ -256,8 +321,16 @@ namespace PoopCat
         {
             public override void Process()
             {
+                var tilesMoved = DropTiles();
+                if (!tilesMoved)
+                {
+                    Owner.StateMachine.SetState(GameState.Push);
+                }
+            }
+
+            public bool DropTiles()
+            {
                 var tilesMoved = false;
-                
                 for (var y = Owner.BoardSize.Y - 1; y > 0; y--)
                 {
                     for (var x = 0; x < Owner.BoardSize.X; x++)
@@ -277,16 +350,23 @@ namespace PoopCat
                         tilesMoved = true;
                     }
                 }
-                if (!tilesMoved)
-                {
-                    Owner.StateMachine.SetState(GameState.Push);
-                }
+                return tilesMoved;
             }
         }
 
         public class PushStateScript : StateScript<GameController, GameState>
         {
             public override void Process()
+            {
+                var tilesMoved = PushColumns();
+
+                if (!tilesMoved)
+                {
+                    Owner.StateMachine.SetState(GameState.CheckOver);
+                }
+            }
+
+            public bool PushColumns()
             {
                 var tilesMoved = false;
 
@@ -297,7 +377,7 @@ namespace PoopCat
                         var tile = Owner.Model.Tiles[x, y];
                         if (tile != null)
                         {
-                            goto doubleBreak;
+                            goto nextColumn;
                         }
                     }
                     for (var y = 0; y < Owner.BoardSize.Y; y++)
@@ -311,13 +391,83 @@ namespace PoopCat
                         Owner.Model.Tiles[x + 1, y] = null;
                         tilesMoved = true;
                     }
-                    doubleBreak: continue;
+                    nextColumn: continue;
                 }
-                if (!tilesMoved)
-                {
-                    Owner.StateMachine.SetState(GameState.WaitForMove);
-                }
+
+                return tilesMoved;
             }
+        }
+
+        public class CheckOverStateScript : StateScript<GameController, GameState>
+        {
+            public override void Process()
+            {
+                for (var y = 1; y < Owner.BoardSize.Y; y++)
+                {
+                    for (var x = 0; x < Owner.BoardSize.X - 1; x++)
+                    {
+                        var tile = Owner.Model.Tiles[x, y];
+                        if (tile == null)
+                        {
+                            continue;
+                        }
+                        var verticalyAdjecentTile = Owner.Model.Tiles[x, y - 1];
+                        var horizontallyAdjecentTile = Owner.Model.Tiles[x + 1, y];
+                        if (horizontallyAdjecentTile?.ColorId == tile.ColorId || verticalyAdjecentTile?.ColorId == tile.ColorId)
+                        {
+                            Owner.StateMachine.SetState(GameState.WaitForMove);
+                            return;
+                        }
+                    }
+                }
+                Owner.StateMachine.SetState(GameState.GrantBonus);
+            }
+        }
+
+        public class OverStateScript : StateScript<GameController, GameState>
+        {
+            public override void Process()
+            {
+            }
+        }
+
+        public class GrantBonusStateScript : StateScript<GameController, GameState>
+        {
+            public override void Process()
+            {
+                var leftOverTileCount = CountLeftOverTiles();
+                GrantPoints(leftOverTileCount);
+                Owner.StateMachine.SetState(GameState.Over);
+            }
+
+            private int CountLeftOverTiles()
+            {
+                var result = 0;
+                for (var y = 0; y < Owner.BoardSize.Y; y++)
+                {
+                    for (var x = 0; x < Owner.BoardSize.X; x++)
+                    {
+                        var tile = Owner.Model.Tiles[x, y];
+                        if (tile == null)
+                        {
+                            continue;
+                        }
+                        result++;
+                    }
+                }
+                return result;
+            }
+
+            private void GrantPoints(int leftOverTileCount)
+            {
+                if (leftOverTileCount >= 10)
+                {
+                    return;
+                }
+                var multiplier = (20 - leftOverTileCount) / 10m;
+                Owner.Model.Score = (int)(Owner.Model.Score * multiplier);
+            }
+
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PoopCat
+namespace SmallHax.CatPoop
 {
     public static class MoveVectors
     {

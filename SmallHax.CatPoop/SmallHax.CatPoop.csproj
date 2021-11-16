@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,10 +8,14 @@
   <ItemGroup>
     <PackageReference Include="SFML.Net" Version="2.5.0" />
     <PackageReference Include="SmallHax.MessageSystem" Version="0.1.3" />
+    <PackageReference Include="SmallHax.SfmlExtensions.Console" Version="0.1.0" />
     <PackageReference Include="SmallHax.State" Version="0.1.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Data\Fonts\fat-font-sheet-1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Data\Images\frame.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

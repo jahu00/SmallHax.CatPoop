@@ -4,10 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PoopCat
+namespace SmallHax.CatPoop
 {
     public class Game
     {
         public Tile[,] Tiles { get; set; }
+
+        public int Score { get; set; }
     }
 }
