@@ -15,5 +15,6 @@ namespace SmallHax.CatPoop
         public Key Right { get; set; } = Key.Right;
         public Key Fire { get; set; } = Key.Space;
         public Key Back { get; set; } = Key.Escape;
+
     }
 }

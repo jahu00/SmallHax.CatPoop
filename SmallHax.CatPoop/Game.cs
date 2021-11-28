@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SFML.System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +12,7 @@ namespace SmallHax.CatPoop
         public Tile[,] Tiles { get; set; }
 
         public int Score { get; set; }
+
+        public Vector2i BoardSize { get; set; }
     }
 }

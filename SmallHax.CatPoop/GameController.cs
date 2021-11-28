@@ -7,6 +7,7 @@ using SmallHax.SfmlExtensions.TileMapper;
 using SmallHax.State;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -30,7 +31,6 @@ namespace SmallHax.CatPoop
         private Color[] Colors { get; set; } = new Color[] { Color.Red, Color.Green, Color.Blue, new Color(255, 165, 0), Color.Magenta };
 
         private Vector2u TileSize { get; set; } = new Vector2u(24, 24);
-        private Vector2i BoardSize { get; set; } = new Vector2i(10, 10);
 
         private Texture TileTexture { get; set; }
 
@@ -38,6 +38,8 @@ namespace SmallHax.CatPoop
 
         private SfmlExtensions.Console Sidebar { get; set; }
         private ConsoleCharacter SidebarBrush { get; set; }
+
+        private SfmlExtensions.Console Overlay { get; set; }
 
         private Game Model { get; set; }
 
@@ -76,9 +78,22 @@ namespace SmallHax.CatPoop
             Sidebar.SetText(9, 0, "╗", sidebarFrameBrush);
             Sidebar.SetText(0, 23, "╚", sidebarFrameBrush);
             Sidebar.SetText(9, 23, "╝", sidebarFrameBrush);
+            Sidebar.SetText(1, 1, "Score:", SidebarBrush);
 
-            CursorPosition = new Vector2i(BoardSize.X / 2, BoardSize.Y / 2);
             CursorSprite = new Sprite(FrameTexture);
+
+            Overlay = new SfmlExtensions.Console(tilesets, 8, 10, 24, 4)
+            {
+                BackgroundColor = new Color(255, 165, 0),
+                Position = new Vector2f(3 * 8, 10 * 10)
+            };
+
+            Overlay.SetText(0, 0, "╔", sidebarFrameBrush);
+            Overlay.SetText(23, 0, "╗", sidebarFrameBrush);
+            Overlay.SetText(0, 3, "╚", sidebarFrameBrush);
+            Overlay.SetText(23, 3, "╝", sidebarFrameBrush);
+            Overlay.SetText(1, 1, "GAME OVER", SidebarBrush);
+
             InitializeStates();
             NewGame();
             StateMachine.SetState(GameState.WaitForMove);
@@ -98,21 +113,26 @@ namespace SmallHax.CatPoop
 
         public void NewGame()
         {
-            Model = new Game();
-            Model.Tiles = new Tile[BoardSize.X, BoardSize.Y];
+            Model = new Game()
+            {
+                BoardSize = new Vector2i(10, 10)
+            };
+            Model.Tiles = new Tile[Model.BoardSize.X, Model.BoardSize.Y];
 
             var random = new Random();
             var maxColorId = Colors.Count();
 
-            for (var y = 0; y < BoardSize.Y; y++)
+            for (var y = 0; y < Model.BoardSize.Y; y++)
             {
-                for (var x = 0; x < BoardSize.X; x++)
+                for (var x = 0; x < Model.BoardSize.X; x++)
                 {
                     var colorId = random.Next(0, maxColorId);
                     var tile = new Tile() { ColorId = colorId };
                     Model.Tiles[x, y] = tile;
                 }
             }
+
+            CursorPosition = new Vector2i(Model.BoardSize.X / 2, Model.BoardSize.Y / 2);
         }
 
         public void Process()
@@ -125,17 +145,22 @@ namespace SmallHax.CatPoop
             DrawTiles(renderTarget);
             DrawCursor(renderTarget);
             DrawScore(renderTarget);
+            if (StateMachine.CurrentState == GameState.Over)
+            {
+                DrawOverlay(renderTarget);
+            }
+        }
+
+        private void DrawOverlay(RenderTarget renderTarget)
+        {
+            renderTarget.Draw(Overlay);
         }
 
         private void DrawScore(RenderTarget renderTarget)
         {
             var scoreStr = Model.Score.ToString().PadLeft(8, '0');
-            /*var text = new Text(scoreStr, Font, 10)
-            {
-                Position = new Vector2f(250, 10)
-            };*/
 
-            Sidebar.SetText(1, 1, scoreStr, SidebarBrush);
+            Sidebar.SetText(1, 2, scoreStr, SidebarBrush);
 
             renderTarget.Draw(Sidebar);
         }
@@ -148,9 +173,9 @@ namespace SmallHax.CatPoop
 
         private void DrawTiles(RenderTarget renderTarget)
         {
-            for (var y = 0; y < BoardSize.Y; y++)
+            for (var y = 0; y < Model.BoardSize.Y; y++)
             {
-                for (var x = 0; x < BoardSize.X; x++)
+                for (var x = 0; x < Model.BoardSize.X; x++)
                 {
                     var tile = Model.Tiles[x, y];
                     if (tile == null)
@@ -166,6 +191,17 @@ namespace SmallHax.CatPoop
                     renderTarget.Draw(tileSprite);
                 }
             }
+        }
+
+        private void ApplyBonus(decimal multiplier)
+        {
+            Model.Score = (int)(Model.Score * multiplier);
+        }
+
+        private void DrawBonus(decimal multiplier)
+        {
+            var multiplierText = multiplier.ToString("#.##", CultureInfo.InvariantCulture);
+            Overlay.SetText(1, 2, $"Bonus: x{multiplierText}", SidebarBrush);
         }
 
         public class WaitForMoveStateScript : StateScript<GameController, GameState>
@@ -201,7 +237,7 @@ namespace SmallHax.CatPoop
                     Owner.CursorPosition += MoveVectors.Up;
                 }
 
-                if (keyInputEvent.Code == Owner.Settings.Down && Owner.CursorPosition.Y < Owner.BoardSize.Y - 1)
+                if (keyInputEvent.Code == Owner.Settings.Down && Owner.CursorPosition.Y < Owner.Model.BoardSize.Y - 1)
                 {
                     Owner.CursorPosition += MoveVectors.Down;
                 }
@@ -211,7 +247,7 @@ namespace SmallHax.CatPoop
                     Owner.CursorPosition += MoveVectors.Left;
                 }
 
-                if (keyInputEvent.Code == Owner.Settings.Right && Owner.CursorPosition.X < Owner.BoardSize.X - 1)
+                if (keyInputEvent.Code == Owner.Settings.Right && Owner.CursorPosition.X < Owner.Model.BoardSize.X - 1)
                 {
                     Owner.CursorPosition += MoveVectors.Right;
                 }
@@ -251,9 +287,9 @@ namespace SmallHax.CatPoop
 
             public List<Vector2i> FindMatchingTiles()
             {
-                var checkedTileMap = new bool[Owner.BoardSize.X,Owner.BoardSize.Y];
+                var checkedTileMap = new bool[Owner.Model.BoardSize.X,Owner.Model.BoardSize.Y];
                 var results = new List<Vector2i>();
-                var totalNumberOfTiles = Owner.BoardSize.X * Owner.BoardSize.Y;
+                var totalNumberOfTiles = Owner.Model.BoardSize.X * Owner.Model.BoardSize.Y;
                 FindMatchingTiles(Owner.CursorPosition, checkedTileMap, results, totalNumberOfTiles);
                 return results;
             }
@@ -288,7 +324,7 @@ namespace SmallHax.CatPoop
                     }
                 }
                 var belowPosition = position + MoveVectors.Down;
-                if (belowPosition.Y < Owner.BoardSize.Y)
+                if (belowPosition.Y < Owner.Model.BoardSize.Y)
                 {
                     var otherTile = Owner.Model.Tiles[belowPosition.X, belowPosition.Y];
                     if (otherTile?.ColorId == tile.ColorId)
@@ -306,7 +342,7 @@ namespace SmallHax.CatPoop
                     }
                 }
                 var rightPosition = position + MoveVectors.Right;
-                if (rightPosition.X < Owner.BoardSize.X)
+                if (rightPosition.X < Owner.Model.BoardSize.X)
                 {
                     var otherTile = Owner.Model.Tiles[rightPosition.X, rightPosition.Y];
                     if (otherTile?.ColorId == tile.ColorId)
@@ -331,9 +367,9 @@ namespace SmallHax.CatPoop
             public bool DropTiles()
             {
                 var tilesMoved = false;
-                for (var y = Owner.BoardSize.Y - 1; y > 0; y--)
+                for (var y = Owner.Model.BoardSize.Y - 1; y > 0; y--)
                 {
-                    for (var x = 0; x < Owner.BoardSize.X; x++)
+                    for (var x = 0; x < Owner.Model.BoardSize.X; x++)
                     {
                         var tile = Owner.Model.Tiles[x, y];
                         if (tile != null)
@@ -370,9 +406,9 @@ namespace SmallHax.CatPoop
             {
                 var tilesMoved = false;
 
-                for (var x = 0; x < Owner.BoardSize.X - 1; x++)
+                for (var x = 0; x < Owner.Model.BoardSize.X - 1; x++)
                 {
-                    for (var y = 0; y < Owner.BoardSize.Y; y++)
+                    for (var y = 0; y < Owner.Model.BoardSize.Y; y++)
                     {
                         var tile = Owner.Model.Tiles[x, y];
                         if (tile != null)
@@ -380,7 +416,7 @@ namespace SmallHax.CatPoop
                             goto nextColumn;
                         }
                     }
-                    for (var y = 0; y < Owner.BoardSize.Y; y++)
+                    for (var y = 0; y < Owner.Model.BoardSize.Y; y++)
                     {
                         var tile = Owner.Model.Tiles[x + 1, y];
                         if (tile == null)
@@ -402,9 +438,9 @@ namespace SmallHax.CatPoop
         {
             public override void Process()
             {
-                for (var y = 1; y < Owner.BoardSize.Y; y++)
+                for (var y = 1; y < Owner.Model.BoardSize.Y; y++)
                 {
-                    for (var x = 0; x < Owner.BoardSize.X - 1; x++)
+                    for (var x = 0; x < Owner.Model.BoardSize.X - 1; x++)
                     {
                         var tile = Owner.Model.Tiles[x, y];
                         if (tile == null)
@@ -443,9 +479,9 @@ namespace SmallHax.CatPoop
             private int CountLeftOverTiles()
             {
                 var result = 0;
-                for (var y = 0; y < Owner.BoardSize.Y; y++)
+                for (var y = 0; y < Owner.Model.BoardSize.Y; y++)
                 {
-                    for (var x = 0; x < Owner.BoardSize.X; x++)
+                    for (var x = 0; x < Owner.Model.BoardSize.X; x++)
                     {
                         var tile = Owner.Model.Tiles[x, y];
                         if (tile == null)
@@ -465,7 +501,8 @@ namespace SmallHax.CatPoop
                     return;
                 }
                 var multiplier = (20 - leftOverTileCount) / 10m;
-                Owner.Model.Score = (int)(Owner.Model.Score * multiplier);
+                Owner.DrawBonus(multiplier);
+                Owner.ApplyBonus(multiplier);
             }
 
         }
