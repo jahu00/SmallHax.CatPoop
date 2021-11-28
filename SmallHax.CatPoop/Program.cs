@@ -22,7 +22,9 @@ namespace SmallHax.CatPoop
             window.KeyPressed += (sender, e) => { inputTopic.PublishMessage(e); };
             window.SetFramerateLimit(60);
 
-            var gameController = new GameController(messageBus);
+            var style = new Style();
+            var settings = new Settings();
+            var gameController = new GameController(messageBus, settings, style);
 
             double processTimer = 0;
             double processInterval = 100;

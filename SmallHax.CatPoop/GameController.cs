@@ -27,72 +27,46 @@ namespace SmallHax.CatPoop
 
     public class GameController
     {
-        private Settings Settings { get; set; } = new Settings();
-        private Color[] Colors { get; set; } = new Color[] { Color.Red, Color.Green, Color.Blue, new Color(255, 165, 0), Color.Magenta };
-
+        private Settings Settings { get; set; }
+        private  Style Style { get; set; }
         private Vector2u TileSize { get; set; } = new Vector2u(24, 24);
-
-        private Texture TileTexture { get; set; }
-
-        private Texture FrameTexture { get; set; }
-
         private SfmlExtensions.Console Sidebar { get; set; }
-        private ConsoleCharacter SidebarBrush { get; set; }
-
         private SfmlExtensions.Console Overlay { get; set; }
-
         private Game Model { get; set; }
-
         private Vector2i CursorPosition { get; set; }
-
         private Sprite CursorSprite { get; set; }
         private StateMachine<GameController, GameState> StateMachine { get; set; }
         private MessageBus<TopicKey> MessageBus { get; set; }
-        public GameController(MessageBus<TopicKey> messageBus)
+        public GameController(MessageBus<TopicKey> messageBus, Settings settings, Style style)
         {
+            Settings = settings;
+            Style = style;
             MessageBus = messageBus;
-            TileTexture = new Texture("Data/Images/poop.png");
-            FrameTexture = new Texture("Data/Images/frame.png");
-            var font = new Texture("Data/Fonts/fat-font-sheet-1.png");
-            var tileset = new Tileset(font, 8, 10);
-            var utf8TileMapper = new Utf8TileMapper();
-            tileset.SetTileMapper(utf8TileMapper);
-            var tileSetName = "fat-font";
-            var tilesets = new Dictionary<string, Tileset>() { { tileSetName, tileset } };
-            Sidebar = new SfmlExtensions.Console(tilesets, 8, 10, 10, 24)
+            Sidebar = new SfmlExtensions.Console(Style.Tilesets, 8, 10, 10, 24)
             {
                 BackgroundColor = new Color(255, 165, 0),
                 Position = new Vector2f(240, 0)
             };
-            SidebarBrush = new ConsoleCharacter()
-            {
-                TilesetName = tileSetName,
-                ForegroundColor = Color.Black
-            };
-            var sidebarFrameBrush = SidebarBrush with
-            {
-                BackgroundColor = Color.Black,
-                ForegroundColor = new Color(255, 165, 0)
-            };
-            Sidebar.SetText(0, 0, "╔", sidebarFrameBrush);
-            Sidebar.SetText(9, 0, "╗", sidebarFrameBrush);
-            Sidebar.SetText(0, 23, "╚", sidebarFrameBrush);
-            Sidebar.SetText(9, 23, "╝", sidebarFrameBrush);
-            Sidebar.SetText(1, 1, "Score:", SidebarBrush);
+            
+            Sidebar.SetText(0, 0, "╔", Style.SidebarFrameBrush);
+            Sidebar.SetText(9, 0, "╗", Style.SidebarFrameBrush);
+            Sidebar.SetText(0, 23, "╚", Style.SidebarFrameBrush);
+            Sidebar.SetText(9, 23, "╝", Style.SidebarFrameBrush);
+            Sidebar.SetText(1, 1, "Score:", Style.SidebarBrush);
 
-            CursorSprite = new Sprite(FrameTexture);
+            CursorSprite = new Sprite(Style.FrameTexture);
 
-            Overlay = new SfmlExtensions.Console(tilesets, 8, 10, 24, 4)
+            Overlay = new SfmlExtensions.Console(Style.Tilesets, 8, 10, 24, 4)
             {
                 BackgroundColor = new Color(255, 165, 0),
                 Position = new Vector2f(3 * 8, 10 * 10)
             };
 
-            Overlay.SetText(0, 0, "╔", sidebarFrameBrush);
-            Overlay.SetText(23, 0, "╗", sidebarFrameBrush);
-            Overlay.SetText(0, 3, "╚", sidebarFrameBrush);
-            Overlay.SetText(23, 3, "╝", sidebarFrameBrush);
-            Overlay.SetText(1, 1, "GAME OVER", SidebarBrush);
+            Overlay.SetText(0, 0, "╔", Style.SidebarFrameBrush);
+            Overlay.SetText(23, 0, "╗", Style.SidebarFrameBrush);
+            Overlay.SetText(0, 3, "╚", Style.SidebarFrameBrush);
+            Overlay.SetText(23, 3, "╝", Style.SidebarFrameBrush);
+            Overlay.SetText(1, 1, "GAME OVER", Style.SidebarBrush);
 
             InitializeStates();
             NewGame();
@@ -120,7 +94,7 @@ namespace SmallHax.CatPoop
             Model.Tiles = new Tile[Model.BoardSize.X, Model.BoardSize.Y];
 
             var random = new Random();
-            var maxColorId = Colors.Count();
+            var maxColorId = Style.Colors.Count();
 
             for (var y = 0; y < Model.BoardSize.Y; y++)
             {
@@ -160,7 +134,7 @@ namespace SmallHax.CatPoop
         {
             var scoreStr = Model.Score.ToString().PadLeft(8, '0');
 
-            Sidebar.SetText(1, 2, scoreStr, SidebarBrush);
+            Sidebar.SetText(1, 2, scoreStr, Style.SidebarBrush);
 
             renderTarget.Draw(Sidebar);
         }
@@ -182,8 +156,8 @@ namespace SmallHax.CatPoop
                     {
                         continue;
                     }
-                    var color = Colors[tile.ColorId];
-                    var tileSprite = new Sprite(TileTexture)
+                    var color = Style.Colors[tile.ColorId];
+                    var tileSprite = new Sprite(Style.TileTexture)
                     {
                         Color = color,
                         Position = new Vector2f(TileSize.X * x, TileSize.Y * y)
@@ -201,7 +175,7 @@ namespace SmallHax.CatPoop
         private void DrawBonus(decimal multiplier)
         {
             var multiplierText = multiplier.ToString("#.##", CultureInfo.InvariantCulture);
-            Overlay.SetText(1, 2, $"Bonus: x{multiplierText}", SidebarBrush);
+            Overlay.SetText(1, 2, $"Bonus: x{multiplierText}", Style.SidebarBrush);
         }
 
         public class WaitForMoveStateScript : StateScript<GameController, GameState>
